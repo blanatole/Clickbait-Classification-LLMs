@@ -1,0 +1,59 @@
+# Virtual environments
+clickbait_env/
+venv/
+env/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Model checkpoints and outputs (exclude large files)
+models/checkpoints/
+outputs/results/
+experiments/*/models/
+experiments/*/outputs/
+
+# API keys and secrets
+.env
+*.key
+config/secrets/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data files (optional - uncomment if data is too large)
+# data/*.zip
+# data/extracted/ 

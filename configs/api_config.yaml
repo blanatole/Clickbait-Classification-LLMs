@@ -1,0 +1,176 @@
+# API Configuration for Prompting Approach
+
+# API providers and models (as recommended in README)
+providers:
+  openai:
+    # API settings
+    api_key_env: "OPENAI_API_KEY"  # Environment variable name
+    base_url: "https://api.openai.com/v1"
+    
+    # Available models
+    models:
+      gpt4:
+        model_name: "gpt-4"
+        max_tokens: 4096
+        temperature: 0.0  # Deterministic for evaluation
+        
+      gpt4_turbo:
+        model_name: "gpt-4-turbo"
+        max_tokens: 4096
+        temperature: 0.0
+        
+      gpt4o:
+        model_name: "gpt-4o"
+        max_tokens: 4096
+        temperature: 0.0
+        
+    # Rate limiting
+    rate_limit:
+      requests_per_minute: 60
+      tokens_per_minute: 150000
+      
+  anthropic:
+    # API settings
+    api_key_env: "ANTHROPIC_API_KEY"
+    
+    # Available models
+    models:
+      claude3_sonnet:
+        model_name: "claude-3-sonnet-20240229"
+        max_tokens: 4096
+        temperature: 0.0
+        
+      claude3_opus:
+        model_name: "claude-3-opus-20240229"
+        max_tokens: 4096
+        temperature: 0.0
+        
+    # Rate limiting
+    rate_limit:
+      requests_per_minute: 60
+      tokens_per_minute: 100000
+      
+  huggingface:
+    # For open-source models via HF Inference API
+    api_key_env: "HUGGINGFACE_API_KEY"
+    
+    # Available models
+    models:
+      mixtral:
+        model_name: "mistralai/Mixtral-8x7B-Instruct-v0.1"
+        max_tokens: 2048
+        temperature: 0.0
+        
+      llama3_70b:
+        model_name: "meta-llama/Llama-2-70b-chat-hf"
+        max_tokens: 2048
+        temperature: 0.0
+
+# Prompting strategies (as outlined in README)
+prompting:
+  # Zero-shot configuration
+  zero_shot:
+    system_prompt: |
+      You are an expert at identifying clickbait content. 
+      Clickbait refers to sensationalized headlines designed to attract clicks through curiosity, 
+      shock, or emotional manipulation rather than informative content.
+      
+    instruction_template: |
+      Analyze the following text and determine if it is clickbait or not.
+      
+      Text: "{text}"
+      
+      Respond with only "Clickbait" or "Not Clickbait".
+      
+    # Response parsing
+    response_parsing:
+      clickbait_keywords: ["clickbait", "Clickbait", "CLICKBAIT"]
+      not_clickbait_keywords: ["not clickbait", "Not Clickbait", "NOT CLICKBAIT", "no clickbait"]
+      
+  # Few-shot configuration
+  few_shot:
+    system_prompt: |
+      You are an expert at identifying clickbait content. 
+      Clickbait refers to sensationalized headlines designed to attract clicks through curiosity, 
+      shock, or emotional manipulation rather than informative content.
+      
+    # Example selection strategy
+    example_selection:
+      num_examples: 5
+      strategy: "diverse"  # Options: random, diverse, similar
+      include_borderline_cases: true
+      
+    instruction_template: |
+      Here are some examples of clickbait and non-clickbait content:
+      
+      {examples}
+      
+      Now analyze the following text and determine if it is clickbait or not.
+      
+      Text: "{text}"
+      
+      Respond with only "Clickbait" or "Not Clickbait".
+
+# Batch processing settings
+batch_processing:
+  batch_size: 10  # Number of requests to process in parallel
+  max_retries: 3
+  retry_delay: 5  # seconds
+  timeout: 30     # seconds per request
+  
+  # Error handling
+  skip_on_error: true
+  save_failed_requests: true
+
+# Cost tracking
+cost_tracking:
+  track_costs: true
+  
+  # Pricing (tokens per dollar) - Update as needed
+  pricing:
+    openai:
+      gpt4: 
+        input_cost_per_1k: 0.03
+        output_cost_per_1k: 0.06
+      gpt4_turbo:
+        input_cost_per_1k: 0.01
+        output_cost_per_1k: 0.03
+      gpt4o:
+        input_cost_per_1k: 0.005
+        output_cost_per_1k: 0.015
+        
+    anthropic:
+      claude3_sonnet:
+        input_cost_per_1k: 0.003
+        output_cost_per_1k: 0.015
+      claude3_opus:
+        input_cost_per_1k: 0.015
+        output_cost_per_1k: 0.075
+
+# Evaluation settings
+evaluation:
+  # Sample sizes for different evaluation phases
+  sample_sizes:
+    quick_test: 100      # For rapid testing
+    validation: 1000     # For thorough validation
+    full_evaluation: -1  # Use entire test set
+    
+  # Metrics to calculate
+  metrics:
+    - "accuracy"
+    - "precision"
+    - "recall"
+    - "f1"
+    - "confusion_matrix"
+    
+  # Results saving
+  save_predictions: true
+  save_probabilities: false  # Not available for most APIs
+  
+# Output settings
+output:
+  results_dir: "outputs/prompting"
+  cache_dir: "outputs/cache"  # For caching API responses
+  
+  # File naming
+  timestamp_format: "%Y%m%d_%H%M%S" 
