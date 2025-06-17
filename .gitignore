@@ -10,6 +10,57 @@ __pycache__/
 *$py.class
 *.so
 .Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# PyTorch model files and checkpoints
+*.pt
+*.pth
+*.safetensors
+checkpoint-*/
+model.safetensors
+optimizer.pt
+scheduler.pt
+
+# Large data files
+data/train/instances.jsonl
+data/val/instances.jsonl
+data/test/instances.jsonl
+data_original/
+
+# Model outputs and logs
+outputs/*/checkpoint-*/
+outputs/*/logs/
+logs/
+wandb/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large analysis files
+*.png
+*.jpg
+*.jpeg
+analysis_results/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Build and development
 build/
 develop-eggs/
 dist/
@@ -26,34 +77,7 @@ wheels/
 .installed.cfg
 *.egg
 
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-logs/
-
-# Model checkpoints and outputs (exclude large files)
-models/checkpoints/
-outputs/results/
-experiments/*/models/
-experiments/*/outputs/
-
 # API keys and secrets
 .env
 *.key
-config/secrets/
-
-# Jupyter
-.ipynb_checkpoints/
-
-# Data files (optional - uncomment if data is too large)
-# data/*.zip
-# data/extracted/ 
+config/secrets/ 

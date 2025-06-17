@@ -1,0 +1,36 @@
+{
+  "timestamp": "2025-06-17T14:54:54.101459",
+  "dataset_overview": {
+    "total_samples": 38517,
+    "clickbait_percentage": 24.08,
+    "average_text_length": 245.06,
+    "text_length_range": {
+      "min": 49,
+      "max": 2416
+    }
+  },
+  "key_differences": {
+    "length_difference": -34.00999999999999,
+    "question_marks_difference": 10.469999999999999,
+    "exclamation_marks_difference": 3.17
+  },
+  "top_indicators": {
+    "tips": 2.358,
+    "you": 1.262,
+    "ways": 1.131,
+    "reasons": 1.102,
+    "facts": 1.051,
+    "incredible": 1.04,
+    "why": 1.032,
+    "what": 0.914,
+    "something": 0.89,
+    "unbelievable": 0.875
+  },
+  "recommendations": [
+    "Clickbait texts tend to be shorter and more emotional",
+    "Focus on personal pronouns (you, your) as strong indicators",
+    "Question marks and exclamation marks are more common in clickbait",
+    "Numbers and superlatives appear frequently in clickbait",
+    "Time-related urgency words are clickbait indicators"
+  ]
+}
