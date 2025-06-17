@@ -1,158 +1,151 @@
-# README – Đồ án Phát hiện Clickbait (Xử lý Văn bản)
+# 🎯 Clickbait Classification Fine-Tuning
 
-## 0. Giới thiệu nhanh
+Dự án fine-tune các mô hình Transformers (BERT, DeBERTa, PhoBERT, LLaMA/Mistral + LoRA) cho bài toán phân loại clickbait trên tập dữ liệu Webis-Clickbait-17.
 
-* **Bài toán**: phân loại tiêu đề hoặc bài đăng thành **Clickbait** (1) và **Not‑clickbait** (0).
-* **Dataset**: Webis‑Clickbait‑17 – đã chia sẵn **80 / 10 / 10**:
+## 📂 Cấu trúc Project
 
-  ```
-  data/
-  ├── train/   # 30 812 mẫu
-  ├── val/     # 3 851 mẫu
-  └── test/    # 3 854 mẫu
-  ```
+```
+clickbait-classification/
+├── 📊 data/                      # Dữ liệu đã được chia sẵn
+│   ├── train/data.jsonl         # 30,812 mẫu training
+│   ├── val/data.jsonl           # Validation set  
+│   └── test/data.jsonl          # Test set
+├── 🚀 scripts/                   # Training & evaluation scripts
+│   ├── train_deberta.py         # Fine-tune DeBERTa-v3-base
+│   ├── train_lora.py            # Fine-tune với LoRA
+│   ├── evaluate_model.py        # Đánh giá mô hình
+│   ├── inference.py             # Inference script
+│   └── setup_environment.py     # Kiểm tra môi trường
+├── 🔧 utils/                     # Utility functions (legacy)
+│   ├── utils.py                 # General utilities
+│   ├── data_preprocessor.py     # Data preprocessing
+│   └── data_analysis.py         # Data analysis tools
+├── 📚 docs/                      # Documentation
+│   └── FINE_TUNING_GUIDE.md     # Hướng dẫn chi tiết
+├── ⚙️ configs/                   # Configuration files
+│   └── model_configs.py         # Model configurations
+├── 📈 outputs/                   # Training outputs
+│   ├── checkpoints/             # Model checkpoints
+│   └── logs/                    # Training logs
+├── requirements.txt             # Dependencies
+├── README.md                    # This file
+└── .gitignore                   # Git ignore rules
+```
 
-  Mỗi thư mục chứa `data.jsonl`:
+## 🚀 Quick Start
 
-  ```jsonc
-  { "id": "abc123", "text": "Tiêu đề", "label": 1 }
-  ```
-
-> **Phạm vi**: chỉ xử lý **text** – bỏ `.png`, `.warc`.
-
----
-
-## 1. Thiết lập môi trường
+### For RTX A5000 Users (Recommended)
 
 ```bash
-conda create -n clickbait python=3.10
-conda activate clickbait
-pip install -r requirements.txt  # transformers, datasets, peft, unsloth, scikit‑learn, etc.
+# Interactive training guide with all optimized models
+python scripts/quick_start_a5000.py
 ```
 
----
+### Manual Training
 
-## 2. Cấu trúc thư mục dự án
-
-```
-project/
-├── data/            # mô tả ở trên
-├── src/
-│   ├── train_bert.py      # fine‑tune BERT / RoBERTa
-│   ├── train_deberta.py   # fine‑tune DeBERTa‑v3
-│   ├── train_vibert.py    # fine‑tune PhoBERT/viBERT (tiếng Việt)
-│   ├── train_lora.py      # fine‑tune LLaMA/Mistral với LoRA
-│   ├── eval.py            # đánh giá trên test set
-│   └── utils.py
-├── outputs/         # checkpoints & logs
-├── notebooks/       # (tuỳ chọn) EDA & prompt thử nghiệm
-└── README.md
+#### 1. Check environment
+```bash
+python scripts/setup_environment.py
 ```
 
----
+#### 2. Train specific models
+```bash
+# BERT family models (optimized batch sizes)
+python scripts/train_bert_family.py --model bert-base-uncased
+python scripts/train_bert_family.py --model deberta-v3-base
+python scripts/train_bert_family.py --model all
 
-## 3. Fine‑tuning các mô hình
+# Large Language Models with QLoRA
+python scripts/train_llm_lora.py --model mistral-7b-v0.2
+python scripts/train_llm_lora.py --model llama3-8b
+python scripts/train_llm_lora.py --model all
+```
 
-### 3.1 BERT / RoBERTa (baseline)
+#### 3. Run full benchmark suite
+```bash
+python scripts/run_all_experiments.py
+```
 
-* **Yêu cầu**: GPU ≥ 8 GB.
-* **Kỳ vọng**: Acc ≈ 85 %, F1 ≈ 0.70.
-* **Mã ví dụ**: xem `src/train_bert.py` (đoạn code trong README bản cũ).
+#### 4. Generate comparison results
+```bash
+python scripts/benchmark_results.py --save_csv
+```
 
-### 3.2 DeBERTa‑v3‑base (English)
+## 📊 Kết quả mong đợi
 
-* **Ưu điểm**: tốt hơn RoBERTa \~1‑2 % F1.
-* **Code** (tương tự BERT):
+| Model | F1-Score | Accuracy | Training Time | VRAM |
+|-------|----------|----------|---------------|------|
+| DeBERTa-v3-base | **0.72** | **86%** | 45 min | 8 GB |
+| LoRA (DialoGPT) | 0.68 | 82% | 25 min | 6 GB |
+| LoRA (Mistral-7B) | **0.75** | **88%** | 90 min | 20 GB |
 
-  ```python
-  tokenizer = AutoTokenizer.from_pretrained("microsoft/deberta-v3-base")
-  model = AutoModelForSequenceClassification.from_pretrained(
-            "microsoft/deberta-v3-base", num_labels=2)
-  ```
-* **Tài nguyên**: GPU 10‑12 GB, batch 16, max\_length 128.
+## 🔧 Yêu cầu hệ thống
 
-### 3.3 DistilBERT / TinyBERT (nhẹ)
+- **Python**: 3.8+
+- **GPU**: CUDA-compatible (khuyến nghị)
+  - BERT/DeBERTa: ≥ 8 GB VRAM
+  - LoRA 7B: ≥ 16-24 GB VRAM
+- **RAM**: ≥ 16 GB
+- **Storage**: ≥ 10 GB free space
 
-* **Dùng khi tài nguyên giới hạn** (≤ 4 GB VRAM).
-* **Kỳ vọng**: F1 ≈ 0.63‑0.66.
-
-### 3.4 PhoBERT‑base / viBERT‑base (tiếng Việt)
-
-* **Khi** tiêu đề phần lớn tiếng Việt.
-* **Model**: `vinai/phobert-base` hoặc `vibert4news-base-cased`.
-* **Chú ý**: chuyển `sentencepiece` + token type xử lý đặc trưng.
-
-### 3.5 ELECTRA‑small (speed‑oriented)
-
-* **Ưu điểm**: infer nhanh gấp \~2× BERT, F1 ≈ 0.67.
-
-### 3.6 LLaMA‑2 / Mistral‑7B với LoRA (PEFT/Unsloth)
-
-* **Yêu cầu**: ≥ 24 GB VRAM (QLoRA: 16 GB).
-* **Kỳ vọng**: F1 ≈ 0.72.
-* **Script**: `src/train_lora.py`.
-
-> **Mẹo lựa chọn**: nếu GPU nhỏ → DistilBERT; GPU trung bình → DeBERTa; muốn đa nhiệm & giải thích → LLaMA/Mistral LoRA.
-
----
-
-## 4. Prompting với LLM (không fine‑tune)
-
-### 4.1 Open‑source chat models
-
-| Model                                   | Thông số | Gợi ý sử dụng                                    |
-| --------------------------------------- | -------- | ------------------------------------------------ |
-| **mistralai/Mistral‑7B‑Instruct**       | 7 B      | Local inference fast, F1 zero‑shot \~0.55        |
-| **meta‑llama/Meta‑Llama‑3‑8B‑Instruct** | 8 B      | Few‑shot F1 \~0.65                               |
-| **openchat/openchat‑3.5‑1210**          | 7 B      | Thử chain‑of‑thought rồi "Answer: Clickbait/Not" |
-
-### 4.2 Hosted API (chi phí theo token)
-
-| Provider                    | Model                    | Ghi chú                                              |
-| --------------------------- | ------------------------ | ---------------------------------------------------- |
-| **OpenAI GPT‑4o**           | `gpt-4o-2024-05-13`      | Few‑shot 3‑5 ví dụ, F1 \~0.75                        |
-| **Anthropic Claude 3 Opus** | `claude-3-opus-20240229` | Khéo prompt "Respond with one word" để giảm dài dòng |
-| **Google Gemini 1.5 Pro**   | `gemini-1.5-pro-latest`  | Cần giới hạn output length                           |
-
-### 4.3 Kỹ thuật prompt
-
-1. **Role + Task + Format** (R‑T‑F).
-2. Sử dụng **few‑shot** 2‑5 cặp ví dụ.
-3. Yêu cầu **chỉ trả lời** "Clickbait" hoặc "Not clickbait".
-4. Với Claude/GPT‑4o: thêm `"You must not provide explanation"` nếu model hay giải thích.
-
----
-
-## 5. Đánh giá
+## 📋 Dependencies
 
 ```bash
-python src/eval.py \
-  --model_dir outputs/deberta \
-  --test_file data/test/data.jsonl
+pip install -r requirements.txt
 ```
 
-`eval.py` in kết quả **Accuracy, Precision, Recall, F1** và confusion matrix.
+**Core libraries:**
+- `torch>=2.1.0` - PyTorch
+- `transformers>=4.35.0` - Hugging Face Transformers
+- `datasets>=2.14.0` - Dataset handling
+- `peft>=0.6.0` - LoRA implementation
+- `scikit-learn>=1.3.0` - Metrics và evaluation
+
+## 🎯 Usage Examples
+
+### Training với custom parameters
+
+```python
+# Trong train_deberta.py, tùy chỉnh:
+training_args = TrainingArguments(
+    learning_rate=1e-5,           # Giảm learning rate
+    per_device_train_batch_size=8, # Giảm batch size nếu thiếu VRAM
+    num_train_epochs=3,           # Ít epochs hơn
+    fp16=True,                    # Mixed precision
+)
+```
+
+### Inference trên text mới
+
+```python
+from transformers import pipeline
+
+classifier = pipeline(
+    "text-classification",
+    model="outputs/deberta-v3-clickbait"
+)
+
+text = "Bạn sẽ không tin điều xảy ra tiếp theo..."
+result = classifier(text)
+print(result)  # [{'label': 'LABEL_1', 'score': 0.95}]
+```
+
+## 📚 Documentation
+
+Xem **[docs/FINE_TUNING_GUIDE.md](docs/FINE_TUNING_GUIDE.md)** để có hướng dẫn chi tiết từng bước.
+
+## 🤝 Contributions
+
+Mọi contributions đều được chào đón! Hãy:
+- Report bugs
+- Suggest improvements  
+- Add new features
+- Share your training results
+
+## 📄 License
+
+This project is licensed under the MIT License.
 
 ---
 
-## 6. Báo cáo & Phân tích
-
-* Bảng so sánh mọi mô hình (Fine‑tune vs Prompt).
-* Error analysis: show 20 tiêu đề khó, lý do sai.
-* Chi phí: GPU giờ, token API.
-
----
-
-## 7. Ghi chú
-
-* Nếu tiêu đề song ngữ Anh‑Việt, cân nhắc **multilingual XLM‑R‑base**.
-* DistilBERT/ELECTRA có thể dùng **knowledge distillation** từ DeBERTa để tăng F1.
-
----
-
-## 8. Tham khảo
-
-* Webis‑Clickbait‑17 Corpus.
-* HuggingFace Transformers, PEFT, Unsloth.
-* "PhoBERT: Pre‑trained BERT models for Vietnamese" – Nguyen & al., 2020.
-* "DeBERTa: Decoding‑enhanced BERT with disentangled attention" – He & al., 2021.
+**Happy Fine-tuning! 🎉**
