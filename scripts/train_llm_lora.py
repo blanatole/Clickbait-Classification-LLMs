@@ -28,8 +28,8 @@ import numpy as np
 
 # Model configurations optimized for RTX A5000 (24GB) with QLoRA
 LLM_CONFIGS = {
-    "mistral-7b-v0.2": {
-        "model_name": "mistralai/Mistral-7B-v0.2",
+    "mistral-7b-v0.3": {
+        "model_name": "mistralai/Mistral-7B-v0.3",
         "batch_size": 10,
         "learning_rate": 5e-6,
         "epochs": 3,
@@ -111,12 +111,16 @@ def setup_model_and_tokenizer(config):
     quantization_config = get_quantization_config(config["quantization"])
     
     # Load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(config["model_name"])
+    tokenizer = AutoTokenizer.from_pretrained(config["model_name"], use_fast=True)
     
-    # Set pad token if not exists
+    # Set pad token if not exists - crucial for batch processing
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
         tokenizer.pad_token_id = tokenizer.eos_token_id
+        print(f"✅ Set pad_token to eos_token: {tokenizer.pad_token}")
+    
+    # Ensure padding side is correct for classification
+    tokenizer.padding_side = "right"
     
     # Load model with quantization
     model = AutoModelForSequenceClassification.from_pretrained(
@@ -125,8 +129,11 @@ def setup_model_and_tokenizer(config):
         quantization_config=quantization_config,
         device_map="auto",
         trust_remote_code=True,
-        torch_dtype=torch.bfloat16
+        torch_dtype= "auto"
     )
+    
+    model.config.pad_token_id = tokenizer.pad_token_id
+    model.resize_token_embeddings(len(tokenizer))
     
     # LoRA configuration
     lora_config = LoraConfig(
@@ -160,14 +167,25 @@ def prepare_dataset(tokenizer, max_length=256):
         "test": "data/test/data.jsonl"
     }
     
+    # Check if data files exist
+    for split, file_path in data_files.items():
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Data file not found: {file_path}")
+    
     dataset = load_dataset("json", data_files=data_files)
     
     def tokenize_function(examples):
+        # Ensure padding token is set
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+            tokenizer.pad_token_id = tokenizer.eos_token_id
+            
         return tokenizer(
             examples["text"],
             truncation=True,
             max_length=max_length,
-            padding=True
+            padding="max_length",  # Always pad to max_length
+            return_tensors=None  # Don't return tensors here
         )
     
     tokenized_dataset = dataset.map(tokenize_function, batched=True)
@@ -209,7 +227,7 @@ def train_model(model_key, config, output_base_dir="outputs"):
         # Training arguments
         training_args = TrainingArguments(
             output_dir=output_dir,
-            evaluation_strategy="epoch",
+            eval_strategy="epoch",
             save_strategy="epoch",
             logging_steps=20,
             learning_rate=config["learning_rate"],

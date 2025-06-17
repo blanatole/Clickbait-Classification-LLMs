@@ -3,6 +3,7 @@ torch>=2.1.0
 transformers>=4.35.0
 datasets>=2.14.0
 accelerate>=0.24.0
+protobuf==3.20.3
 
 # LoRA and PEFT
 peft>=0.6.0

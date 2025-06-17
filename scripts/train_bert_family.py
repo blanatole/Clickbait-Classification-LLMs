@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Fine-tune BERT family models (BERT-base, DeBERTa-v3-base, BERT-large) 
+Fine-tune BERT family models (BERT-base, BERT-large) 
 Optimized for RTX A5000 (24 GB VRAM)
+Compatible with PyTorch 2.5+ and latest transformers
 """
 
 import argparse
@@ -27,7 +28,7 @@ import numpy as np
 # Model configurations optimized for RTX A5000 (24GB)
 MODEL_CONFIGS = {
     "bert-base-uncased": {
-        "model_name": "google-bert/bert-base-uncased",
+        "model_name": "bert-base-uncased",
         "batch_size": 48,  # Conservative for 24GB
         "learning_rate": 2e-5,
         "epochs": 4,
@@ -35,17 +36,8 @@ MODEL_CONFIGS = {
         "fp16": True,
         "gradient_accumulation_steps": 1
     },
-    "deberta-v3-base": {
-        "model_name": "microsoft/deberta-v3-base", 
-        "batch_size": 28,  # Slightly lower due to larger model
-        "learning_rate": 1e-5,
-        "epochs": 4,
-        "max_length": 128,
-        "fp16": True,
-        "gradient_accumulation_steps": 1
-    },
     "bert-large-uncased": {
-        "model_name": "google-bert/bert-large-uncased",
+        "model_name": "bert-large-uncased",
         "batch_size": 16,  # Much larger model
         "learning_rate": 1e-5,
         "epochs": 3,
@@ -78,6 +70,11 @@ def prepare_dataset(tokenizer, max_length=128):
         "validation": "data/val/data.jsonl",
         "test": "data/test/data.jsonl"
     }
+    
+    # Check if data files exist
+    for split, file_path in data_files.items():
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Data file not found: {file_path}")
     
     dataset = load_dataset("json", data_files=data_files)
     
@@ -127,7 +124,7 @@ def train_model(model_key, config, output_base_dir="outputs"):
     # Training arguments
     training_args = TrainingArguments(
         output_dir=output_dir,
-        evaluation_strategy="epoch",
+        eval_strategy="epoch",
         save_strategy="epoch",
         logging_steps=50,
         learning_rate=config["learning_rate"],
