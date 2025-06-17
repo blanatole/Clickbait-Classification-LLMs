@@ -30,9 +30,18 @@ The goal is to classify Twitter headlines as clickbait or non-clickbait using th
 
 ### Environment Setup
 ```bash
+# Cài conda nếu chưa có 
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+bash miniconda.sh -b -p $HOME/miniconda   # -b = batch (không hỏi)
+eval "$($HOME/miniconda/bin/conda shell.bash hook)"  # thêm lệnh conda vào shell
+conda init      # ghi vào ~/.bashrc rồi mở shell mới hoặc source ~/.bashrc
+
 # Create conda environment
-conda create -n clickbait python=3.10
+conda create -n clickbait python=3.10 -y
 conda activate clickbait
+
+#Hủy kích hoạt môi trường ảo
+deactivate
 
 # Install PyTorch (CUDA 12.1)
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
@@ -291,17 +300,7 @@ LoraConfig(
 
 ### Python Dependencies
 ```txt
-torch>=2.5.0
-transformers>=4.36.0
-datasets>=2.14.0
-accelerate>=0.24.0
-peft>=0.6.0
-bitsandbytes>=0.41.0
-scikit-learn>=1.3.0
-pandas>=2.0.0
-numpy>=1.24.0
-wandb>=0.16.0
-tensorboard>=2.14.0
+requirements.txt
 ```
 
 ### Hardware Requirements
@@ -317,6 +316,24 @@ tensorboard>=2.14.0
 3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+## Cách push trực tiếp lên repository (chỉ dánh cho chủ sở hữu repo)
+- Git add
+- Sau khi git add thì git commit nếu lần đầu thì phải đặt name và email tùy ý
+- sau đó 
+# 1) Kiểm tra đã có khóa?
+ls ~/.ssh/id_ed25519.pub  # nếu chưa có file, tạo mới ↓
+
+# 2) Tạo SSH key cặp ED25519 (mạnh, ngắn)
+ssh-keygen -t ed25519 -C "minhi@example.com"    # cứ Enter 3 lần để nhận mặc định
+# -> tạo ~/.ssh/id_ed25519 & id_ed25519.pub
+
+# 3) Thêm khóa vào ssh-agent (giúp git không hỏi passphrase mỗi lần)
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_ed25519
+
+# 4) Sao chép khóa public
+cat ~/.ssh/id_ed25519.pub
 
 ## 📄 License
 
