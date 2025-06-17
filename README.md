@@ -1,16 +1,38 @@
 # Clickbait Classification using LLM Fine-tuning
 
-A comprehensive clickbait detection system using fine-tuned BERT models and Large Language Models with LoRA/QLoRA, optimized for RTX A5000 (24GB VRAM).
+A complete pipeline for detecting clickbait headlines using fine-tuned BERT-family models and LoRA/QLoRA-adapted large language models. Optimized for an RTX A5000 (24 GB VRAM) but configurable for any CUDA GPU.
+
+## 📑 Table of Contents
+
+- [🎯 Project Overview](#-project-overview)
+- [📊 Dataset](#-dataset)
+- [🛠️ Installation & Setup](#️-installation--setup)
+- [📁 Project Structure](#-project-structure)
+- [🤖 Supported Models](#-supported-models)
+- [🚀 Quick Start](#-quick-start)
+- [📊 Performance Results](#-performance-results)
+- [🔧 Technical Fixes](#-technical-fixes-implemented)
+- [🐛 Troubleshooting](#-troubleshooting)
+- [📈 Monitoring & Logging](#-monitoring--logging)
+- [🔍 Model Configuration Details](#-model-configuration-details)
+- [🎯 Future Improvements](#-future-improvements)
+- [📋 Requirements](#-requirements)
+- [🤝 Contributing](#-contributing)
+- [🚀 Push to GitHub (Repo Owner)](#-push-to-github-repo-owner)
+- [📄 License](#-license)
+- [🙏 Acknowledgments](#-acknowledgments)
+- [📞 Support](#-support)
 
 ## 🎯 Project Overview
 
-This project implements clickbait detection using two main approaches:
-1. **Fine-tuning BERT family models** (BERT-base, BERT-large)
-2. **Fine-tuning Large Language Models** with LoRA (Mistral, Llama)
+This repository implements two complementary approaches to classifying Twitter headlines as clickbait or not-clickbait using the Webis-Clickbait-17 corpus:
 
-The goal is to classify Twitter headlines as clickbait or non-clickbait using the Webis-Clickbait-17 dataset.
+1. **Full fine-tune** of BERT-family encoders (BERT-base, BERT-large)
+2. **Parameter-efficient fine-tune** of modern chat-LLMs (Mistral / Llama) with LoRA / QLoRA
 
-## 📊 Dataset Information
+All training scripts are pre-tuned for an RTX A5000, yet expose CLI flags so you can dial batch-size, precision, LoRA rank, etc. for smaller GPUs.
+
+## 📊 Dataset 
 
 - **Source**: Webis-Clickbait-17 dataset
 - **Total samples**: 38,517 Twitter headlines
@@ -29,18 +51,19 @@ The goal is to classify Twitter headlines as clickbait or non-clickbait using th
 - 24GB+ VRAM for optimal performance
 
 ### Environment Setup
+
 ```bash
-# Cài conda nếu chưa có 
+# Install conda if not already installed
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
-bash miniconda.sh -b -p $HOME/miniconda   # -b = batch (không hỏi)
-eval "$($HOME/miniconda/bin/conda shell.bash hook)"  # thêm lệnh conda vào shell
-conda init      # ghi vào ~/.bashrc rồi mở shell mới hoặc source ~/.bashrc
+bash miniconda.sh -b -p $HOME/miniconda   # -b = batch (no prompts)
+eval "$($HOME/miniconda/bin/conda shell.bash hook)"  # add conda command to shell
+conda init      # write to ~/.bashrc then open new shell or source ~/.bashrc
 
 # Create conda environment
 conda create -n clickbait python=3.10 -y
 conda activate clickbait
 
-#Hủy kích hoạt môi trường ảo
+# Deactivate virtual environment
 deactivate
 
 # Install PyTorch (CUDA 12.1)
@@ -54,7 +77,9 @@ pip install peft bitsandbytes accelerate
 ```
 
 ### Hugging Face Authentication
+
 For accessing gated models (Mistral, Llama):
+
 ```bash
 # Login to Hugging Face
 huggingface-cli login
@@ -67,22 +92,22 @@ export HUGGINGFACE_HUB_TOKEN="your_token_here"
 
 ```
 clickbait-classification/
-├── 📊 data/                      # Dữ liệu đã được chia sẵn
-│   ├── train/data.jsonl         # 30,812 mẫu training
+├── 📊 data/                      # Pre-split data
+│   ├── train/data.jsonl         # 30,812 training samples
 │   ├── val/data.jsonl           # Validation set  
 │   └── test/data.jsonl          # Test set
 ├── 🚀 scripts/                   # Training & evaluation scripts
 │   ├── train_deberta.py         # Fine-tune DeBERTa-v3-base
-│   ├── train_lora.py            # Fine-tune với LoRA
-│   ├── evaluate_model.py        # Đánh giá mô hình
+│   ├── train_lora.py            # Fine-tune with LoRA
+│   ├── evaluate_model.py        # Model evaluation
 │   ├── inference.py             # Inference script
-│   └── setup_environment.py     # Kiểm tra môi trường
+│   └── setup_environment.py     # Environment check
 ├── 🔧 utils/                     # Utility functions (legacy)
 │   ├── utils.py                 # General utilities
 │   ├── data_preprocessor.py     # Data preprocessing
 │   └── data_analysis.py         # Data analysis tools
 ├── 📚 docs/                      # Documentation
-│   └── FINE_TUNING_GUIDE.md     # Hướng dẫn chi tiết
+│   └── FINE_TUNING_GUIDE.md     # Detailed guide
 ├── ⚙️ configs/                   # Configuration files
 │   └── model_configs.py         # Model configurations
 ├── 📈 outputs/                   # Training outputs
@@ -96,12 +121,14 @@ clickbait-classification/
 ## 🤖 Supported Models
 
 ### BERT Family Models
+
 | Model | Batch Size | Learning Rate | Epochs | Max Length | Training Time |
 |-------|------------|---------------|--------|------------|---------------|
 | BERT-base-uncased | 48 | 2e-5 | 4 | 128 | ~45 min |
 | BERT-large-uncased | 16 | 1e-5 | 3 | 128 | ~1.5 hours |
 
 ### Large Language Models (LoRA)
+
 | Model | Quantization | LoRA Rank | Batch Size | Training Time |
 |-------|--------------|-----------|------------|---------------|
 | Mistral-7B-v0.3 | 4-bit | 8 | 10 | ~2 hours |
@@ -111,6 +138,7 @@ clickbait-classification/
 ## 🚀 Quick Start
 
 ### 1. BERT Family Training
+
 ```bash
 # Train all BERT models
 python scripts/train_bert_family.py --model all
@@ -123,6 +151,7 @@ python scripts/train_bert_family.py --model bert-base-uncased --output_dir my_ou
 ```
 
 ### 2. LLM LoRA Training
+
 ```bash
 # Ensure Hugging Face authentication
 huggingface-cli login
@@ -135,6 +164,7 @@ python scripts/train_llm_lora.py --model all
 ```
 
 ### 3. Model Evaluation
+
 ```bash
 # Evaluate trained model
 python scripts/evaluate_model.py --model_path outputs/bert-base-uncased-a5000
@@ -146,6 +176,7 @@ python scripts/inference.py --model_path outputs/bert-base-uncased-a5000 --text 
 ## 📊 Performance Results
 
 ### BERT Models
+
 - **BERT-base-uncased**: 
   - Accuracy: 83.2%
   - F1-score: 85.1%
@@ -157,6 +188,7 @@ python scripts/inference.py --model_path outputs/bert-base-uncased-a5000 --text 
   - Training time: 1.5 hours
 
 ### LLM Models (LoRA)
+
 - **Mistral-7B-v0.3**:
   - Accuracy: 87.9%
   - F1-score: 89.2%
@@ -276,6 +308,7 @@ LoraConfig(
 ## 🎯 Future Improvements
 
 ### Planned Features
+
 1. **Prompting Approaches**
    - Zero-shot classification with GPT-4
    - Few-shot learning with Claude
@@ -299,9 +332,7 @@ LoraConfig(
 ## 📋 Requirements
 
 ### Python Dependencies
-```txt
-requirements.txt
-```
+See `requirements.txt` for complete list.
 
 ### Hardware Requirements
 - **Minimum**: 16GB VRAM GPU
@@ -317,23 +348,58 @@ requirements.txt
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## Cách push trực tiếp lên repository (chỉ dánh cho chủ sở hữu repo)
-- Git add
-- Sau khi git add thì git commit nếu lần đầu thì phải đặt name và email tùy ý
-- sau đó 
-# 1) Kiểm tra đã có khóa?
-ls ~/.ssh/id_ed25519.pub  # nếu chưa có file, tạo mới ↓
+## 🚀 Push to GitHub (Repo Owner)
 
-# 2) Tạo SSH key cặp ED25519 (mạnh, ngắn)
-ssh-keygen -t ed25519 -C "minhi@example.com"    # cứ Enter 3 lần để nhận mặc định
-# -> tạo ~/.ssh/id_ed25519 & id_ed25519.pub
+Direct push method for repository owners:
 
-# 3) Thêm khóa vào ssh-agent (giúp git không hỏi passphrase mỗi lần)
+### 1. Check for existing SSH keys
+```bash
+ls ~/.ssh/id_ed25519.pub  # if no file exists, create new one below
+```
+
+### 2. Generate SSH key pair (ED25519 - strong and short)
+```bash
+ssh-keygen -t ed25519 -C "your-email@example.com"    # press Enter 3 times for defaults
+# Creates ~/.ssh/id_ed25519 & id_ed25519.pub
+```
+
+### 3. Add key to ssh-agent (helps git not ask for passphrase every time)
+```bash
 eval "$(ssh-agent -s)"
 ssh-add ~/.ssh/id_ed25519
+```
 
-# 4) Sao chép khóa public
+### 4. Copy public key
+```bash
 cat ~/.ssh/id_ed25519.pub
+```
+
+### 5. Add to GitHub
+- Go to Settings → Deploy keys → Add deploy key
+- Enter title and paste key into text area → Add key
+
+### 6. Test connection in project terminal
+```bash
+ssh -T git@github.com
+# First time will ask "Are you sure you want to continue connecting?" → type yes
+# Should see message: "Hi <username>! You've successfully authenticated..."
+```
+
+### 7. Point remote to SSH instead of HTTPS
+```bash
+# Check current remote (should be https)
+git remote -v
+
+# Change to SSH
+git remote set-url origin git@github.com:<username>/<repo>.git
+```
+
+### 8. Now you can push without password prompts
+```bash
+git add .
+git commit -m "Fix BERT training"
+git push origin main      # won't ask for user/password anymore
+```
 
 ## 📄 License
 
