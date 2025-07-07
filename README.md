@@ -1,6 +1,6 @@
 # Clickbait Classification using LLM Fine-tuning
 
-A complete pipeline for detecting clickbait headlines using fine-tuned BERT-family models and LoRA/QLoRA-adapted large language models. Optimized for an RTX A5000 (24 GB VRAM) but configurable for any CUDA GPU.
+A complete pipeline for detecting clickbait headlines using fine-tuned BERT-family models and LoRA/QLoRA-adapted large language models. Optimized for an RTX A6000 (48 GB VRAM) but configurable for any CUDA GPU.
 
 ## 📑 Table of Contents
 
@@ -30,7 +30,7 @@ This repository implements two complementary approaches to classifying Twitter h
 1. **Full fine-tune** of BERT-family encoders (BERT-base, BERT-large)
 2. **Parameter-efficient fine-tune** of modern chat-LLMs (Mistral / Llama) with LoRA / QLoRA
 
-All training scripts are pre-tuned for an RTX A5000, yet expose CLI flags so you can dial batch-size, precision, LoRA rank, etc. for smaller GPUs.
+All training scripts are pre-tuned for an RTX A6000, yet expose CLI flags so you can dial batch-size, precision, LoRA rank, etc. for smaller GPUs.
 
 ## 📊 Dataset 
 
@@ -47,8 +47,8 @@ All training scripts are pre-tuned for an RTX A5000, yet expose CLI flags so you
 
 ### Prerequisites
 - Python 3.10+
-- CUDA-compatible GPU (RTX A5000 recommended)
-- 24GB+ VRAM for optimal performance
+- CUDA-compatible GPU (RTX A6000 recommended)
+- 48GB+ VRAM for optimal performance
 
 ### Environment Setup
 
@@ -124,16 +124,16 @@ clickbait-classification/
 
 | Model | Batch Size | Learning Rate | Epochs | Max Length | Training Time |
 |-------|------------|---------------|--------|------------|---------------|
-| BERT-base-uncased | 48 | 2e-5 | 4 | 128 | ~45 min |
-| BERT-large-uncased | 16 | 1e-5 | 3 | 128 | ~1.5 hours |
+| BERT-base-uncased | 96 | 2e-5 | 4 | 128 | ~45 min |
+| BERT-large-uncased | 32 | 1e-5 | 3 | 128 | ~1.5 hours |
 
 ### Large Language Models (LoRA)
 
 | Model | Quantization | LoRA Rank | Batch Size | Training Time |
 |-------|--------------|-----------|------------|---------------|
-| Mistral-7B-v0.3 | 4-bit | 8 | 10 | ~2 hours |
-| Llama2-7B | 4-bit | 8 | 10 | ~2.5 hours |
-| Llama3-8B | 4-bit | 8 | 8 | ~3 hours |
+| Mistral-7B-v0.3 | 4-bit | 8 | 20 | ~2 hours |
+| Llama2-7B | 4-bit | 8 | 20 | ~2.5 hours |
+| Llama3-8B | 4-bit | 8 | 16 | ~3 hours |
 
 ## 🚀 Quick Start
 
@@ -167,10 +167,10 @@ python scripts/train_llm_lora.py --model all
 
 ```bash
 # Evaluate trained model
-python scripts/evaluate_model.py --model_path outputs/bert-base-uncased-a5000
+python scripts/evaluate_model.py --model_path outputs/bert-base-uncased-a6000
 
 # Run inference on custom text
-python scripts/inference.py --model_path outputs/bert-base-uncased-a5000 --text "You won't believe what happened next!"
+python scripts/inference.py --model_path outputs/bert-base-uncased-a6000 --text "You won't believe what happened next!"
 ```
 
 ## 📊 Performance Results

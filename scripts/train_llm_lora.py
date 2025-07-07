@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Fine-tune Large Language Models with LoRA/QLoRA
-Optimized for RTX A5000 (24 GB VRAM) - supports Mistral, Llama models
+Optimized for RTX A6000 (48 GB VRAM) - supports Mistral, Llama models
 """
 
 import argparse
@@ -26,22 +26,22 @@ from sklearn.metrics import accuracy_score, f1_score, classification_report
 import numpy as np
 
 
-# Model configurations optimized for RTX A5000 (24GB) with QLoRA
+# Model configurations optimized for RTX A6000 (48GB) with QLoRA
 LLM_CONFIGS = {
     "mistral-7b-v0.3": {
         "model_name": "mistralai/Mistral-7B-v0.3",
-        "batch_size": 10,
+        "batch_size": 20,  # Increased for 48GB
         "learning_rate": 5e-6,
         "epochs": 3,
         "max_length": 256,
         "quantization": "4bit",
         "lora_r": 8,
         "lora_alpha": 16,
-        "gradient_accumulation_steps": 6  # Effective batch = 60
+        "gradient_accumulation_steps": 6  # Effective batch = 120
     },
     "mistral-7b-instruct": {
         "model_name": "mistralai/Mistral-7B-Instruct-v0.2",
-        "batch_size": 10,
+        "batch_size": 20,  # Increased for 48GB
         "learning_rate": 3e-6,  # Lower for instruct model
         "epochs": 2,  # Fewer epochs for instruct
         "max_length": 256,
@@ -52,7 +52,7 @@ LLM_CONFIGS = {
     },
     "llama2-7b": {
         "model_name": "meta-llama/Llama-2-7b-hf",
-        "batch_size": 10,
+        "batch_size": 20,  # Increased for 48GB
         "learning_rate": 5e-6,
         "epochs": 3,
         "max_length": 256,
@@ -63,25 +63,25 @@ LLM_CONFIGS = {
     },
     "llama3-8b": {
         "model_name": "meta-llama/Meta-Llama-3-8B",
-        "batch_size": 8,  # Slightly larger model
+        "batch_size": 16,  # Increased for 48GB
         "learning_rate": 4e-6,
         "epochs": 3,
         "max_length": 256,
         "quantization": "4bit",
         "lora_r": 8,
         "lora_alpha": 16,
-        "gradient_accumulation_steps": 8  # Effective batch = 64
+        "gradient_accumulation_steps": 8  # Effective batch = 128
     },
     "llama2-13b": {
         "model_name": "meta-llama/Llama-2-13b-hf",
-        "batch_size": 5,  # Much larger model
+        "batch_size": 10,  # Increased for 48GB
         "learning_rate": 3e-6,
         "epochs": 2,
         "max_length": 256,
         "quantization": "8bit",  # 8-bit for 13B
         "lora_r": 8,
         "lora_alpha": 16,
-        "gradient_accumulation_steps": 12  # Effective batch = 60
+        "gradient_accumulation_steps": 12  # Effective batch = 120
     }
 }
 
@@ -214,7 +214,7 @@ def train_model(model_key, config, output_base_dir="outputs"):
     start_time = time.time()
     
     # Setup paths
-    output_dir = f"{output_base_dir}/{model_key}-lora-a5000"
+    output_dir = f"{output_base_dir}/{model_key}-lora-a6000"
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     
     try:
@@ -340,7 +340,7 @@ def train_model(model_key, config, output_base_dir="outputs"):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train LLMs with LoRA on RTX A5000")
+    parser = argparse.ArgumentParser(description="Train LLMs with LoRA on RTX A6000")
     parser.add_argument("--model", choices=list(LLM_CONFIGS.keys()) + ["all"], 
                        default="mistral-7b-v0.2", help="Model to train")
     parser.add_argument("--output_dir", default="outputs", help="Output directory")

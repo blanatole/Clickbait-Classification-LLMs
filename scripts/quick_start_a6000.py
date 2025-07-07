@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Quick Start Guide for RTX A5000 Clickbait Classification Training
+Quick Start Guide for RTX A6000 Clickbait Classification Training
 Interactive script to guide users through the training process
 """
 
@@ -13,11 +13,11 @@ from pathlib import Path
 def print_header():
     """Print welcome header"""
     print("🎯" + "="*78 + "🎯")
-    print("   CLICKBAIT CLASSIFICATION - RTX A5000 TRAINING SUITE")
+    print("   CLICKBAIT CLASSIFICATION - RTX A6000 TRAINING SUITE")
     print("🎯" + "="*78 + "🎯")
     print()
     print("This interactive guide will help you train state-of-the-art models")
-    print("for clickbait classification on your RTX A5000 GPU.")
+    print("for clickbait classification on your RTX A6000 GPU.")
     print()
 
 
@@ -59,7 +59,7 @@ def check_prerequisites():
 
 def show_model_options():
     """Show available model options"""
-    print("\n📋 AVAILABLE MODELS FOR RTX A5000 (24GB)")
+    print("\n📋 AVAILABLE MODELS FOR RTX A6000 (48GB)")
     print("-" * 50)
     
     models = [

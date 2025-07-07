@@ -42,12 +42,14 @@ def check_gpu():
             print(f"Memory: {gpu_memory:.1f} GB")
             
             # Memory recommendations
-            if gpu_memory >= 24:
-                print("✅ Excellent! Can handle large models with LoRA (7B+)")
-            elif gpu_memory >= 16:
+            if gpu_memory >= 48:
+                print("✅ Excellent! Can handle large models with LoRA (13B+)")
+            elif gpu_memory >= 24:
                 print("✅ Good! Can handle LoRA training (7B models)")
-            elif gpu_memory >= 8:
+            elif gpu_memory >= 16:
                 print("✅ OK! Can handle BERT/DeBERTa fine-tuning")
+            elif gpu_memory >= 8:
+                print("✅ OK! Can handle BERT fine-tuning")
             else:
                 print("⚠️  Limited memory. Consider smaller batch sizes or models")
         
@@ -149,8 +151,8 @@ def print_training_commands():
     print("="*60)
     print()
     
-    print("1️⃣  Interactive training guide (RTX A5000):")
-    print("   python scripts/quick_start_a5000.py")
+    print("1️⃣  Interactive training guide (RTX A6000):")
+    print("   python scripts/quick_start_a6000.py")
     print()
     
     print("2️⃣  Train BERT family models:")

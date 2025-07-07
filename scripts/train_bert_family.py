@@ -25,11 +25,11 @@ from sklearn.metrics import accuracy_score, f1_score, classification_report
 import numpy as np
 
 
-# Model configurations optimized for RTX A5000 (24GB)
+# Model configurations optimized for RTX A6000 (48GB)
 MODEL_CONFIGS = {
     "bert-base-uncased": {
         "model_name": "bert-base-uncased",
-        "batch_size": 48,  # Conservative for 24GB
+        "batch_size": 96,  # Increased for 48GB
         "learning_rate": 2e-5,
         "epochs": 4,
         "max_length": 128,
@@ -38,12 +38,12 @@ MODEL_CONFIGS = {
     },
     "bert-large-uncased": {
         "model_name": "bert-large-uncased",
-        "batch_size": 16,  # Much larger model
+        "batch_size": 32,  # Increased for 48GB
         "learning_rate": 1e-5,
         "epochs": 3,
         "max_length": 128,
         "fp16": True,
-        "gradient_accumulation_steps": 2  # Effective batch = 32
+        "gradient_accumulation_steps": 2  # Effective batch = 64
     }
 }
 
@@ -112,7 +112,7 @@ def train_model(model_key, config, output_base_dir="outputs"):
     start_time = time.time()
     
     # Setup paths
-    output_dir = f"{output_base_dir}/{model_key}-a5000"
+    output_dir = f"{output_base_dir}/{model_key}-a6000"
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     
     # Setup model and tokenizer
