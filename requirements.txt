@@ -48,7 +48,6 @@ fastjsonschema==2.21.1
 ffmpy==0.6.0
 filelock==3.13.1
 flake8==7.2.0
-flash_attn==2.8.0.post2
 fonttools==4.58.4
 fqdn==1.5.1
 frozenlist==1.7.0

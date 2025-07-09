@@ -1,6 +1,6 @@
 # Clickbait Classification using LLM Fine-tuning
 
-A complete pipeline for detecting clickbait headlines using fine-tuned BERT-family models and LoRA/QLoRA-adapted large language models. Optimized for an RTX A6000 (48 GB VRAM) but configurable for any CUDA GPU.
+A complete pipeline for detecting clickbait headlines using fine-tuned BERT-family models and LoRA/QLoRA-adapted large language models. Optimized for high-end CUDA GPUs but configurable for various hardware setups.
 
 ## 📑 Table of Contents
 
@@ -27,10 +27,27 @@ A complete pipeline for detecting clickbait headlines using fine-tuned BERT-fami
 
 This repository implements two complementary approaches to classifying Twitter headlines as clickbait or not-clickbait using the Webis-Clickbait-17 corpus:
 
-1. **Full fine-tune** of BERT-family encoders (BERT-base, BERT-large)
-2. **Parameter-efficient fine-tune** of modern chat-LLMs (Mistral / Llama) with LoRA / QLoRA
+### 🔬 Fine-tuning Module
+Complete pipeline for fine-tuning models with your own data:
+- **BERT family models**: Full fine-tuning of BERT-base, BERT-large, RoBERTa
+- **Large Language Models**: Parameter-efficient fine-tuning with LoRA/QLoRA for Mistral, Llama models
+- **Comprehensive evaluation**: Metrics, analysis, and model comparison tools
 
-All training scripts are pre-tuned for an RTX A6000, yet expose CLI flags so you can dial batch-size, precision, LoRA rank, etc. for smaller GPUs.
+### 🎯 Prompting Module  
+Zero-shot and few-shot approaches using pre-trained models:
+- **Zero-shot prompting**: Direct classification without training
+- **Few-shot prompting**: With example demonstrations
+- **Advanced techniques**: Chain-of-thought, self-consistency, improved prompting strategies
+- **Multiple model support**: OpenAI GPT, Claude, local models via API
+
+### 🔧 Shared Resources
+Common utilities and resources used by both approaches:
+- **Data preprocessing**: Standardized data handling and analysis
+- **Evaluation framework**: Unified metrics and benchmarking
+- **Environment setup**: Automated dependency management
+- **Comparison tools**: Side-by-side performance analysis
+
+All scripts are optimized for high-end CUDA GPUs but configurable for smaller GPUs through CLI parameters.
 
 ## 📊 Dataset 
 
@@ -47,8 +64,8 @@ All training scripts are pre-tuned for an RTX A6000, yet expose CLI flags so you
 
 ### Prerequisites
 - Python 3.10+
-- CUDA-compatible GPU (RTX A6000 recommended)
-- 48GB+ VRAM for optimal performance
+- CUDA-compatible GPU (high-end GPU recommended)
+- 16GB+ VRAM for optimal performance
 
 ### Environment Setup
 
@@ -91,28 +108,44 @@ export HUGGINGFACE_HUB_TOKEN="your_token_here"
 ## 📁 Project Structure
 
 ```
-clickbait-classification/
-├── 📊 data/                      # Pre-split data
-│   ├── train/data.jsonl         # 30,812 training samples
-│   ├── val/data.jsonl           # Validation set  
-│   └── test/data.jsonl          # Test set
-├── 🚀 scripts/                   # Training & evaluation scripts
-│   ├── train_deberta.py         # Fine-tune DeBERTa-v3-base
-│   ├── train_lora.py            # Fine-tune with LoRA
-│   ├── evaluate_model.py        # Model evaluation
-│   ├── inference.py             # Inference script
-│   └── setup_environment.py     # Environment check
-├── 🔧 utils/                     # Utility functions (legacy)
-│   ├── utils.py                 # General utilities
-│   ├── data_preprocessor.py     # Data preprocessing
-│   └── data_analysis.py         # Data analysis tools
-├── 📚 docs/                      # Documentation
-│   └── FINE_TUNING_GUIDE.md     # Detailed guide
-├── ⚙️ configs/                   # Configuration files
-│   └── model_configs.py         # Model configurations
-├── 📈 outputs/                   # Training outputs
-│   ├── checkpoints/             # Model checkpoints
-│   └── logs/                    # Training logs
+clickbait-classification-LLM/
+├── 🔬 fine-tuning/              # Fine-tuning module
+│   ├── scripts/                 # Training scripts
+│   │   ├── train_llm_lora.py    # Fine-tune LLMs with LoRA
+│   │   ├── train_bert_family.py # Fine-tune BERT family models
+│   │   └── evaluate_model.py    # Model evaluation
+│   ├── outputs/                 # Training results (checkpoints, logs)
+│   ├── models/                  # Fine-tuned models
+│   └── README.md                # Fine-tuning guide
+├── 🎯 prompting/                # Prompting module
+│   ├── scripts/                 # Prompting scripts
+│   │   ├── prompting_example.py     # Basic prompting examples
+│   │   ├── prompting_unified.py     # Unified prompting approach
+│   │   ├── improved_prompting.py    # Advanced prompting techniques
+│   │   └── inference.py            # Inference with prompting
+│   ├── outputs/                 # Prompting results
+│   ├── results/                 # Evaluation results
+│   └── README.md                # Prompting guide
+├── 🔧 shared/                   # Shared resources
+│   ├── utils/                   # Utility functions
+│   │   ├── utils.py             # General utilities
+│   │   ├── data_preprocessor.py # Data preprocessing
+│   │   ├── data_analysis.py     # Data analysis tools
+│   │   └── preprocess_clickbait_alpaca.py # Alpaca format preprocessing
+│   ├── scripts/                 # Common scripts
+│   │   ├── setup_environment.py     # Environment setup
+│   │   ├── run_all_experiments.py   # Run all experiments
+│   │   ├── benchmark_results.py     # Benchmark results
+│   │   ├── run_evaluation.py        # Common evaluation
+│   │   ├── test_api.py              # API testing
+│   │   ├── test_api_unified.py      # Unified API testing
+│   │   └── test_available_models.py # Model availability testing
+│   └── data/                    # Datasets
+│       ├── train/               # Training data
+│       ├── val/                 # Validation data
+│       └── test/                # Testing data
+├── 📚 docs/                     # Documentation
+│   └── PROMPTING_GUIDE.md       # Prompting techniques guide
 ├── requirements.txt             # Dependencies
 ├── README.md                    # This file
 └── .gitignore                   # Git ignore rules
@@ -131,46 +164,61 @@ clickbait-classification/
 
 | Model | Quantization | LoRA Rank | Batch Size | Training Time |
 |-------|--------------|-----------|------------|---------------|
-| Mistral-7B-v0.3 | 4-bit | 8 | 20 | ~2 hours |
-| Llama2-7B | 4-bit | 8 | 20 | ~2.5 hours |
-| Llama3-8B | 4-bit | 8 | 16 | ~3 hours |
+| Mistral-7B-Instruct-v0.3 | 4-bit | 8 | 20 | ~2 hours |
+| Llama-3.1-8B-Instruct | 4-bit | 8 | 16 | ~3 hours |
 
 ## 🚀 Quick Start
 
-### 1. BERT Family Training
+### 1. Setup Environment
 
 ```bash
-# Train all BERT models
-python scripts/train_bert_family.py --model all
+# Setup environment and dependencies
+python shared/scripts/setup_environment.py
 
-# Train specific model
-python scripts/train_bert_family.py --model bert-base-uncased
-
-# Custom output directory
-python scripts/train_bert_family.py --model bert-base-uncased --output_dir my_outputs
+# Run all experiments (both fine-tuning and prompting)
+python shared/scripts/run_all_experiments.py
 ```
 
-### 2. LLM LoRA Training
+### 2. Fine-tuning Approach
 
 ```bash
-# Ensure Hugging Face authentication
+# Train BERT family models
+python fine-tuning/scripts/train_bert_family.py --model bert-base-uncased
+python fine-tuning/scripts/train_bert_family.py --model bert-large-uncased
+
+# Train LLM with LoRA (ensure Hugging Face authentication first)
 huggingface-cli login
+python fine-tuning/scripts/train_llm_lora.py --model mistral-7b-instruct
+python fine-tuning/scripts/train_llm_lora.py --model llama3-8b
 
-# Train Mistral with LoRA
-python scripts/train_llm_lora.py --model mistral-7b-v0.3
-
-# Train all LLM models
-python scripts/train_llm_lora.py --model all
+# Evaluate fine-tuned models
+python fine-tuning/scripts/evaluate_model.py --model_path fine-tuning/models/bert-base-uncased
 ```
 
-### 3. Model Evaluation
+### 3. Prompting Approach
 
 ```bash
-# Evaluate trained model
-python scripts/evaluate_model.py --model_path outputs/bert-base-uncased-a6000
+# Basic prompting examples
+python prompting/scripts/prompting_example.py
 
-# Run inference on custom text
-python scripts/inference.py --model_path outputs/bert-base-uncased-a6000 --text "You won't believe what happened next!"
+# Unified prompting approach
+python prompting/scripts/prompting_unified.py
+
+# Advanced prompting techniques
+python prompting/scripts/improved_prompting.py
+
+# Inference with prompting
+python prompting/scripts/inference.py --text "You won't believe what happened next!"
+```
+
+### 4. Benchmark and Compare Results
+
+```bash
+# Compare results between fine-tuning and prompting
+python shared/scripts/benchmark_results.py
+
+# Run comprehensive evaluation
+python shared/scripts/run_evaluation.py
 ```
 
 ## 📊 Performance Results
@@ -189,10 +237,16 @@ python scripts/inference.py --model_path outputs/bert-base-uncased-a6000 --text 
 
 ### LLM Models (LoRA)
 
-- **Mistral-7B-v0.3**:
+- **Mistral-7B-Instruct-v0.3**:
   - Accuracy: 87.9%
   - F1-score: 89.2%
   - Training time: 2 hours
+  - Parameters trained: ~0.5% of total
+
+- **Llama-3.1-8B-Instruct**:
+  - Accuracy: 88.5%
+  - F1-score: 90.1%
+  - Training time: 3 hours
   - Parameters trained: ~0.5% of total
 
 ## 🔧 Technical Fixes Implemented
@@ -336,7 +390,7 @@ See `requirements.txt` for complete list.
 
 ### Hardware Requirements
 - **Minimum**: 16GB VRAM GPU
-- **Recommended**: RTX A5000 (24GB VRAM)
+- **Recommended**: High-end GPU with 16GB+ VRAM
 - **RAM**: 32GB+ system memory
 - **Storage**: 50GB+ free space
 
@@ -421,4 +475,4 @@ For questions and support:
 
 ---
 
-**Note**: This project is optimized for RTX A5000 GPUs. Adjust batch sizes and configurations for different hardware setups.
+**Note**: This project is optimized for high-end CUDA GPUs. Adjust batch sizes and configurations for different hardware setups.
