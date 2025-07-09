@@ -1,7 +1,20 @@
 #!/usr/bin/env python3
 """
-Fine-tune Large Language Models with LoRA/QLoRA
-Optimized for high-end CUDA GPUs with sufficient VRAM - supports Mistral, Llama models
+Fine-tune Large Language Models with LoRA/QLoRA and RS-LoRA
+Optimized for RTX A6000 (48GB VRAM) - Maximum Performance Configuration
+
+Supports:
+- Mistral-7B-Instruct: Full precision, large batches, high LoRA rank
+- Llama-3.1-8B-Instruct: Full precision with RS-LoRA
+- Llama-3.1-8B-Instruct-Quantized: 4-bit quantization for extreme batch sizes
+
+RTX A6000 Optimizations:
+- No quantization for maximum quality (where VRAM permits)
+- Large batch sizes (32-48) to utilize 48GB VRAM
+- Extended sequence lengths (512-768 tokens)
+- High LoRA rank (128-256) for maximum parameter efficiency
+- RS-LoRA support for enhanced performance
+- Cosine learning rate schedule with proper warmup
 """
 
 import argparse
@@ -27,29 +40,55 @@ import numpy as np
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
-# Model configurations optimized for SPEED on high-end CUDA GPUs
+# Model configurations optimized for RTX A6000 (48GB VRAM) - MAXIMUM PERFORMANCE
 LLM_CONFIGS = {
     "mistral-7b-instruct": {
         "model_name": "mistralai/Mistral-7B-Instruct-v0.3",
-        "batch_size": 16,  # Increased for speed
-        "learning_rate": 2e-4,  # Higher LR for faster convergence
-        "epochs": 2,  # Reduced epochs
-        "max_length": 128,  # Reduced sequence length for speed
-        "quantization": "4bit",
-        "lora_r": 8,  # Reduced rank for speed
-        "lora_alpha": 32,  # Reduced alpha
-        "gradient_accumulation_steps": 2  # Effective batch = 32
+        "batch_size": 32,  # Large batch to utilize 48GB VRAM
+        "learning_rate": 1e-4,  # Stable learning rate for quality
+        "epochs": 5,  # More epochs for better convergence
+        "max_length": 512,  # Longer sequences for better context
+        "quantization": "none",  # No quantization to maximize performance
+        "lora_r": 128,  # High rank for maximum parameter efficiency
+        "lora_alpha": 256,  # 2x lora_r for optimal scaling
+        "lora_dropout": 0.05,  # Lower dropout for more parameters
+        "gradient_accumulation_steps": 1,  # Direct training with large batch
+        "weight_decay": 0.01,
+        "warmup_ratio": 0.1,
+        "lr_scheduler_type": "cosine",
+        "use_rslora": False  # Standard LoRA
     },
     "llama3-8b": {
+        "model_name": "meta-llama/Llama-3.1-8B-Instruct", 
+        "batch_size": 24,  # Slightly smaller for 8B model
+        "learning_rate": 5e-5,  # Lower LR for larger model
+        "epochs": 5,  # More epochs for better convergence
+        "max_length": 512,  # Longer sequences for better context
+        "quantization": "none",  # No quantization to maximize performance
+        "lora_r": 128,  # High rank for maximum parameter efficiency
+        "lora_alpha": 256,  # 2x lora_r for optimal scaling
+        "lora_dropout": 0.05,  # Lower dropout for more parameters
+        "gradient_accumulation_steps": 1,  # Direct training with large batch
+        "weight_decay": 0.01,
+        "warmup_ratio": 0.1,
+        "lr_scheduler_type": "cosine",
+        "use_rslora": True  # RS-LoRA for better performance
+    },
+    "llama3-8b-quantized": {
         "model_name": "meta-llama/Llama-3.1-8B-Instruct",
-        "batch_size": 12,  # Increased for speed
-        "learning_rate": 1.5e-4,  # Higher LR for faster convergence
-        "epochs": 2,  # Reduced epochs
-        "max_length": 128,  # Reduced sequence length for speed
-        "quantization": "4bit",
-        "lora_r": 8,  # Reduced rank for speed
-        "lora_alpha": 32,  # Reduced alpha
-        "gradient_accumulation_steps": 3  # Effective batch = 36
+        "batch_size": 48,  # Even larger batch with quantization
+        "learning_rate": 8e-5,  # Slightly higher for quantized training
+        "epochs": 6,  # More epochs to compensate for quantization
+        "max_length": 768,  # Very long sequences
+        "quantization": "4bit",  # Use quantization for extreme batch sizes
+        "lora_r": 256,  # Very high rank
+        "lora_alpha": 512,  # 2x lora_r for optimal scaling
+        "lora_dropout": 0.03,  # Very low dropout
+        "gradient_accumulation_steps": 1,
+        "weight_decay": 0.008,
+        "warmup_ratio": 0.15,
+        "lr_scheduler_type": "cosine",
+        "use_rslora": True  # RS-LoRA for better performance
     }
 }
 
@@ -68,6 +107,8 @@ def get_quantization_config(quantization_type):
         return BitsAndBytesConfig(
             load_in_8bit=True,
         )
+    elif quantization_type == "none" or quantization_type is None:
+        return None
     else:
         return None
 
@@ -114,18 +155,27 @@ def setup_model_and_tokenizer(config):
     else:
         print(f"✅ No need to resize embeddings (vocab size: {len(tokenizer)})")
     
-    # LoRA configuration
-    lora_config = LoraConfig(
-        task_type=TaskType.SEQ_CLS,
-        r=config["lora_r"],
-        lora_alpha=config["lora_alpha"],
-        lora_dropout=0.1,  # Increased dropout for regularization
-        target_modules=[
+    # LoRA configuration - Support for both standard LoRA and RS-LoRA
+    lora_kwargs = {
+        "task_type": TaskType.SEQ_CLS,
+        "r": config["lora_r"],
+        "lora_alpha": config["lora_alpha"],
+        "lora_dropout": config.get("lora_dropout", 0.05),
+        "target_modules": [
             "q_proj", "v_proj", "k_proj", "o_proj",
             "gate_proj", "up_proj", "down_proj"
         ],
-        bias="none"
-    )
+        "bias": "none"
+    }
+    
+    # Add RS-LoRA support if specified
+    if config.get("use_rslora", False):
+        lora_kwargs["use_rslora"] = True
+        print("✅ Using RS-LoRA configuration for enhanced performance")
+    else:
+        print("✅ Using standard LoRA configuration")
+    
+    lora_config = LoraConfig(**lora_kwargs)
     
     # Apply LoRA
     model = get_peft_model(model, lora_config)
@@ -231,35 +281,44 @@ def train_model(model_key, config, output_base_dir="outputs", quick_train=False)
         # Prepare dataset
         tokenized_dataset = prepare_dataset(tokenizer, config["max_length"], quick_train)
         
-        # Training arguments - OPTIMIZED FOR SPEED
+        # Training arguments - OPTIMIZED FOR RTX A6000 (48GB VRAM)
         training_args = TrainingArguments(
             output_dir=output_dir,
             eval_strategy="epoch",
-            save_strategy="epoch",
-            logging_steps=10,  # More frequent logging
+            save_strategy="epoch", 
+            logging_steps=25,  # Balanced logging frequency
             learning_rate=config["learning_rate"],
             per_device_train_batch_size=config["batch_size"],
             per_device_eval_batch_size=config["batch_size"],
             gradient_accumulation_steps=config["gradient_accumulation_steps"],
             num_train_epochs=config["epochs"],
-            weight_decay=0.01,
-            warmup_steps=50,  # Reduced warmup for speed
-            warmup_ratio=0.05,  # Reduced warmup ratio
-            lr_scheduler_type="linear",  # Linear scheduler for simplicity
+            weight_decay=config.get("weight_decay", 0.01),
+            warmup_ratio=config.get("warmup_ratio", 0.1),
+            lr_scheduler_type=config.get("lr_scheduler_type", "cosine"),
             load_best_model_at_end=True,
             metric_for_best_model="f1",
             greater_is_better=True,
-            bf16=True,  # Use bfloat16 for speed
-            dataloader_num_workers=4,  # More workers for data loading
+            bf16=True,  # Use bfloat16 for A6000 compatibility
+            dataloader_num_workers=8,  # More workers for large batches
             gradient_checkpointing=True,
-            report_to=None,  # Disable wandb for speed
-            save_total_limit=1,  # Keep only best checkpoint
-            dataloader_pin_memory=True,  # Pin memory for speed
-            optim="adamw_8bit",  # Memory efficient optimizer
-            max_grad_norm=1.0,  # Gradient clipping
+            report_to=None,  # Disable wandb by default 
+            save_total_limit=3,  # Keep more checkpoints for quality
+            dataloader_pin_memory=True,
+            optim="adamw_torch",  # Standard AdamW for maximum performance
+            max_grad_norm=1.0,
             logging_dir=f"{output_dir}/logs",
-            disable_tqdm=False,  # Keep progress bar
-            dataloader_persistent_workers=True  # Persistent workers for speed
+            disable_tqdm=False,
+            dataloader_persistent_workers=True,
+            # Additional A6000 optimizations
+            fp16_full_eval=False,  # Use bf16 for eval too
+            ddp_find_unused_parameters=False,  # For multi-GPU efficiency
+            dataloader_drop_last=True,  # Consistent batch sizes
+            group_by_length=True,  # Optimize sequence lengths
+            length_column_name="length",  # For sequence length grouping
+            prediction_loss_only=False,
+            # Memory and performance optimizations
+            torch_compile=False,  # Stable training
+            seed=42  # Reproducible results
         )
         
         # Create trainer
@@ -270,7 +329,7 @@ def train_model(model_key, config, output_base_dir="outputs", quick_train=False)
             eval_dataset=tokenized_dataset["validation"],
             tokenizer=tokenizer,
             compute_metrics=compute_metrics,
-            callbacks=[EarlyStoppingCallback(early_stopping_patience=1)]
+            callbacks=[EarlyStoppingCallback(early_stopping_patience=3)]  # More patience for quality training
         )
         
         # Train
@@ -353,22 +412,41 @@ def train_model(model_key, config, output_base_dir="outputs", quick_train=False)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train LLMs with LoRA - OPTIMIZED FOR SPEED")
-    parser.add_argument("--model", choices=["mistral-7b-instruct", "llama3-8b", "all"], default="all", help="Model to train")
+    parser = argparse.ArgumentParser(description="Train LLMs with LoRA - OPTIMIZED FOR RTX A6000")
+    parser.add_argument("--model", 
+                       choices=["mistral-7b-instruct", "llama3-8b", "llama3-8b-quantized", "all"], 
+                       default="all", 
+                       help="Model to train: mistral-7b-instruct, llama3-8b (no quant), llama3-8b-quantized (max batch), or all")
     parser.add_argument("--output_dir", default="fine-tuning/outputs", help="Output directory")
     parser.add_argument("--quick", action="store_true", help="Quick training with subset of data")
     
     args = parser.parse_args()
     
-    # Check GPU
+    # Check GPU configuration
     if torch.cuda.is_available():
-        gpu_name = torch.cuda.get_device_name(0)
-        gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)
-        print(f"🔧 GPU: {gpu_name} ({gpu_memory:.1f} GB)")
+        gpu_count = torch.cuda.device_count()
+        print(f"🔧 CUDA GPUs detected: {gpu_count}")
         
-        if gpu_memory < 16:
-            print("⚠️  Warning: LLM training requires at least 16GB VRAM")
-            print("   Consider using smaller models or reduce batch sizes")
+        total_memory = 0
+        for i in range(gpu_count):
+            gpu_name = torch.cuda.get_device_name(i)
+            gpu_memory = torch.cuda.get_device_properties(i).total_memory / (1024**3)
+            total_memory += gpu_memory
+            print(f"   GPU {i}: {gpu_name} ({gpu_memory:.1f} GB)")
+        
+        print(f"   Total GPU Memory: {total_memory:.1f} GB")
+        
+        # RTX A6000 specific optimizations
+        if "A6000" in gpu_name:
+            print("✅ RTX A6000 detected! Using optimized configuration for maximum performance")
+            print("   • No quantization for full precision")
+            print("   • Large batch sizes to utilize 48GB VRAM") 
+            print("   • Extended sequences for better context")
+        elif gpu_memory >= 40:
+            print("✅ High-end GPU detected! Using performance configuration")
+        elif gpu_memory < 16:
+            print("⚠️  Warning: GPU has limited VRAM. Consider using quantized models")
+            print("   Recommended: Use 'llama3-8b-quantized' configuration")
     else:
         print("❌ No CUDA GPU detected!")
         return
