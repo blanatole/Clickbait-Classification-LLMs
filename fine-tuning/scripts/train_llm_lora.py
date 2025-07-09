@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """
-Fine-tune Large Language Models with LoRA/QLoRA
-Optimized for high-end CUDA GPUs with sufficient VRAM - supports Mistral, Llama models
+Fine-tune Large Language Models with LoRA/QLoRA and RS-LoRA
+Optimized for dual RTX A6000 GPUs (2x 48GB VRAM) - supports Mistral, Llama models
+
+For multi-GPU training, run with:
+    python -m torch.distributed.launch --nproc_per_node=2 train_llm_lora.py
+
+Or using accelerate:
+    accelerate launch train_llm_lora.py
 """
 
 import argparse
@@ -27,29 +33,37 @@ import numpy as np
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
-# Model configurations optimized for SPEED on high-end CUDA GPUs
+# Model configurations optimized for 2x RTX A6000 GPUs (48GB VRAM each)
 LLM_CONFIGS = {
     "mistral-7b-instruct": {
         "model_name": "mistralai/Mistral-7B-Instruct-v0.3",
-        "batch_size": 16,  # Increased for speed
-        "learning_rate": 2e-4,  # Higher LR for faster convergence
-        "epochs": 2,  # Reduced epochs
-        "max_length": 128,  # Reduced sequence length for speed
+        "batch_size": 8,  # Per device batch size for dual GPU setup
+        "learning_rate": 2e-4,  # As specified in requirements
+        "epochs": 5,  # 5 epochs as specified
+        "max_length": 512,  # Increased for better performance
         "quantization": "4bit",
-        "lora_r": 8,  # Reduced rank for speed
-        "lora_alpha": 32,  # Reduced alpha
-        "gradient_accumulation_steps": 2  # Effective batch = 32
+        "lora_r": 64,  # Increased for ~167M parameters (~2.26%)
+        "lora_alpha": 128,  # 2x lora_r for optimal scaling
+        "gradient_accumulation_steps": 4,  # As specified
+        "weight_decay": 1e-3,  # As specified
+        "lr_scheduler_type": "cosine",  # Cosine schedule as specified
+        "warmup_steps": 100,
+        "lora_type": "standard"  # Standard LoRA
     },
     "llama3-8b": {
         "model_name": "meta-llama/Llama-3.1-8B-Instruct",
-        "batch_size": 12,  # Increased for speed
-        "learning_rate": 1.5e-4,  # Higher LR for faster convergence
-        "epochs": 2,  # Reduced epochs
-        "max_length": 128,  # Reduced sequence length for speed
+        "batch_size": 16,  # As specified in requirements
+        "learning_rate": 5e-5,  # As specified in requirements
+        "epochs": 5,  # 5 epochs as specified
+        "max_length": 512,  # Increased for better performance
         "quantization": "4bit",
-        "lora_r": 8,  # Reduced rank for speed
-        "lora_alpha": 32,  # Reduced alpha
-        "gradient_accumulation_steps": 3  # Effective batch = 36
+        "lora_r": 64,  # Increased for ~167M parameters (~2.05%)
+        "lora_alpha": 128,  # 2x lora_r for optimal scaling
+        "gradient_accumulation_steps": 4,  # As specified
+        "weight_decay": 1e-2,  # As specified (1e-2)
+        "lr_scheduler_type": "cosine",  # Cosine schedule with warmup
+        "warmup_steps": 200,  # 200-step warmup as specified
+        "lora_type": "rs_lora"  # RS-LoRA as specified
     }
 }
 
@@ -114,18 +128,27 @@ def setup_model_and_tokenizer(config):
     else:
         print(f"✅ No need to resize embeddings (vocab size: {len(tokenizer)})")
     
-    # LoRA configuration
-    lora_config = LoraConfig(
-        task_type=TaskType.SEQ_CLS,
-        r=config["lora_r"],
-        lora_alpha=config["lora_alpha"],
-        lora_dropout=0.1,  # Increased dropout for regularization
-        target_modules=[
+    # LoRA configuration - Support for both standard LoRA and RS-LoRA
+    lora_kwargs = {
+        "task_type": TaskType.SEQ_CLS,
+        "r": config["lora_r"],
+        "lora_alpha": config["lora_alpha"],
+        "lora_dropout": 0.1,  # Dropout for regularization
+        "target_modules": [
             "q_proj", "v_proj", "k_proj", "o_proj",
             "gate_proj", "up_proj", "down_proj"
         ],
-        bias="none"
-    )
+        "bias": "none"
+    }
+    
+    # Add RS-LoRA specific configuration if specified
+    if config.get("lora_type") == "rs_lora":
+        lora_kwargs["use_rslora"] = True
+        print("✅ Using RS-LoRA configuration")
+    else:
+        print("✅ Using standard LoRA configuration")
+    
+    lora_config = LoraConfig(**lora_kwargs)
     
     # Apply LoRA
     model = get_peft_model(model, lora_config)
@@ -231,35 +254,43 @@ def train_model(model_key, config, output_base_dir="outputs", quick_train=False)
         # Prepare dataset
         tokenized_dataset = prepare_dataset(tokenizer, config["max_length"], quick_train)
         
-        # Training arguments - OPTIMIZED FOR SPEED
+        # Training arguments - OPTIMIZED for dual RTX A6000 GPUs
         training_args = TrainingArguments(
             output_dir=output_dir,
             eval_strategy="epoch",
             save_strategy="epoch",
-            logging_steps=10,  # More frequent logging
+            logging_steps=50,  # Logging frequency
             learning_rate=config["learning_rate"],
             per_device_train_batch_size=config["batch_size"],
             per_device_eval_batch_size=config["batch_size"],
             gradient_accumulation_steps=config["gradient_accumulation_steps"],
             num_train_epochs=config["epochs"],
-            weight_decay=0.01,
-            warmup_steps=50,  # Reduced warmup for speed
-            warmup_ratio=0.05,  # Reduced warmup ratio
-            lr_scheduler_type="linear",  # Linear scheduler for simplicity
+            weight_decay=config["weight_decay"],
+            warmup_steps=config.get("warmup_steps", 100),
+            lr_scheduler_type=config.get("lr_scheduler_type", "cosine"),
             load_best_model_at_end=True,
             metric_for_best_model="f1",
             greater_is_better=True,
-            bf16=True,  # Use bfloat16 for speed
-            dataloader_num_workers=4,  # More workers for data loading
+            bf16=True,  # Use bfloat16 for A6000 compatibility
+            dataloader_num_workers=4,  # Data loading workers
             gradient_checkpointing=True,
-            report_to=None,  # Disable wandb for speed
-            save_total_limit=1,  # Keep only best checkpoint
-            dataloader_pin_memory=True,  # Pin memory for speed
-            optim="adamw_8bit",  # Memory efficient optimizer
+            report_to=None,  # Disable wandb by default
+            save_total_limit=2,  # Keep best and latest checkpoints
+            dataloader_pin_memory=True,
+            optim="adamw_torch",  # Standard AdamW for stability
             max_grad_norm=1.0,  # Gradient clipping
             logging_dir=f"{output_dir}/logs",
-            disable_tqdm=False,  # Keep progress bar
-            dataloader_persistent_workers=True  # Persistent workers for speed
+            disable_tqdm=False,
+            dataloader_persistent_workers=True,
+            # Multi-GPU settings for 2x RTX A6000
+            ddp_find_unused_parameters=False,
+            ddp_backend="nccl",  # Optimal for NVIDIA GPUs
+            dataloader_drop_last=True,  # For consistent batch sizes across GPUs
+            prediction_loss_only=False,
+            # Early stopping patience
+            evaluation_strategy="epoch",
+            save_steps=None,  # Save at epoch end only
+            eval_steps=None   # Evaluate at epoch end only
         )
         
         # Create trainer
@@ -270,7 +301,7 @@ def train_model(model_key, config, output_base_dir="outputs", quick_train=False)
             eval_dataset=tokenized_dataset["validation"],
             tokenizer=tokenizer,
             compute_metrics=compute_metrics,
-            callbacks=[EarlyStoppingCallback(early_stopping_patience=1)]
+            callbacks=[EarlyStoppingCallback(early_stopping_patience=2)]  # Patience for 5 epochs
         )
         
         # Train
@@ -360,15 +391,29 @@ def main():
     
     args = parser.parse_args()
     
-    # Check GPU
+    # Check GPU configuration
     if torch.cuda.is_available():
-        gpu_name = torch.cuda.get_device_name(0)
-        gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)
-        print(f"🔧 GPU: {gpu_name} ({gpu_memory:.1f} GB)")
+        gpu_count = torch.cuda.device_count()
+        print(f"🔧 CUDA GPUs detected: {gpu_count}")
         
-        if gpu_memory < 16:
-            print("⚠️  Warning: LLM training requires at least 16GB VRAM")
-            print("   Consider using smaller models or reduce batch sizes")
+        total_memory = 0
+        for i in range(gpu_count):
+            gpu_name = torch.cuda.get_device_name(i)
+            gpu_memory = torch.cuda.get_device_properties(i).total_memory / (1024**3)
+            total_memory += gpu_memory
+            print(f"   GPU {i}: {gpu_name} ({gpu_memory:.1f} GB)")
+        
+        print(f"   Total GPU Memory: {total_memory:.1f} GB")
+        
+        if gpu_count == 2:
+            print("✅ Optimal dual-GPU setup detected for RTX A6000 configuration")
+        elif gpu_count == 1:
+            print("⚠️  Single GPU detected. Consider using smaller batch sizes.")
+        else:
+            print(f"ℹ️  {gpu_count} GPUs detected. Training will use all available GPUs.")
+            
+        if total_memory < 32:
+            print("⚠️  Warning: Recommended 32GB+ total VRAM for optimal performance")
     else:
         print("❌ No CUDA GPU detected!")
         return

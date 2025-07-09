@@ -1,0 +1,101 @@
+# Training Configuration for Dual RTX A6000 Setup
+# Total VRAM: 2x 48GB = 96GB
+
+# Global settings
+global:
+  cuda_memory_fraction: 0.9
+  mixed_precision: "bf16"
+  gradient_checkpointing: true
+  dataloader_num_workers: 4
+
+# Model configurations
+models:
+  mistral-7b-instruct:
+    model_name: "mistralai/Mistral-7B-Instruct-v0.3"
+    # Training hyperparameters as specified
+    batch_size: 8              # Per device batch size
+    learning_rate: 2.0e-4      # 2e−4 as specified
+    epochs: 5                  # 5 epochs as specified
+    max_length: 512            # Sequence length
+    quantization: "4bit"       # Memory optimization
+    
+    # LoRA configuration for ~167M parameters (~2.26%)
+    lora_r: 64                 # Increased rank for more parameters
+    lora_alpha: 128            # 2x lora_r for optimal scaling
+    lora_dropout: 0.1
+    lora_type: "standard"      # Standard LoRA
+    
+    # Training schedule
+    gradient_accumulation_steps: 4    # As specified
+    weight_decay: 1.0e-3              # 1e−3 as specified
+    lr_scheduler_type: "cosine"       # Cosine schedule as specified
+    warmup_steps: 100
+    
+    # Target modules for LoRA
+    target_modules:
+      - "q_proj"
+      - "v_proj"
+      - "k_proj"
+      - "o_proj"
+      - "gate_proj"
+      - "up_proj"
+      - "down_proj"
+
+  llama3-8b:
+    model_name: "meta-llama/Llama-3.1-8B-Instruct"
+    # Training hyperparameters as specified
+    batch_size: 16             # As specified in requirements
+    learning_rate: 5.0e-5      # 5e−5 as specified
+    epochs: 5                  # 5 epochs as specified
+    max_length: 512            # Sequence length
+    quantization: "4bit"       # Memory optimization
+    
+    # RS-LoRA configuration for ~167M parameters (~2.05%)
+    lora_r: 64                 # Increased rank for more parameters
+    lora_alpha: 128            # 2x lora_r for optimal scaling
+    lora_dropout: 0.1
+    lora_type: "rs_lora"       # RS-LoRA as specified
+    
+    # Training schedule
+    gradient_accumulation_steps: 4    # As specified
+    weight_decay: 1.0e-2              # 1e−2 as specified (10x higher than Mistral)
+    lr_scheduler_type: "cosine"       # Cosine schedule with warmup
+    warmup_steps: 200                 # 200-step warmup as specified
+    
+    # Target modules for LoRA
+    target_modules:
+      - "q_proj"
+      - "v_proj"
+      - "k_proj"
+      - "o_proj"
+      - "gate_proj"
+      - "up_proj"
+      - "down_proj"
+
+# Hardware optimization
+hardware:
+  gpu_count: 2
+  gpu_type: "RTX A6000"
+  total_vram_gb: 96
+  distributed_backend: "nccl"
+  
+# Training optimization
+optimization:
+  optimizer: "adamw_torch"
+  max_grad_norm: 1.0
+  early_stopping_patience: 2
+  save_total_limit: 2
+  evaluation_strategy: "epoch"
+  save_strategy: "epoch"
+  
+# Expected results
+expected_performance:
+  mistral:
+    trainable_parameters: "~167M"
+    percentage_of_total: "~2.26%"
+    effective_batch_size: 32  # 8 * 4 accumulation * 1 GPU (per GPU)
+    
+  llama:
+    trainable_parameters: "~167M" 
+    percentage_of_total: "~2.05%"
+    effective_batch_size: 64  # 16 * 4 accumulation * 1 GPU (per GPU) 
