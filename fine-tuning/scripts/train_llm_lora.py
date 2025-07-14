@@ -27,55 +27,36 @@ import numpy as np
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
-# Model configurations optimized for RTX A6000 (48GB VRAM) - MAXIMUM PERFORMANCE
+# Model configurations optimized for QUALITY to achieve >0.85 F1 score
 LLM_CONFIGS = {
     "mistral-7b-instruct": {
         "model_name": "mistralai/Mistral-7B-Instruct-v0.3",
-        "batch_size": 32,  # Large batch to utilize 48GB VRAM
-        "learning_rate": 1e-4,  # Stable learning rate for quality
-        "epochs": 5,  # More epochs for better convergence
-        "max_length": 512,  # Longer sequences for better context
-        "quantization": "none",  # No quantization to maximize performance
-        "lora_r": 128,  # High rank for maximum parameter efficiency
-        "lora_alpha": 256,  # 2x lora_r for optimal scaling
-        "lora_dropout": 0.05,  # Lower dropout for more parameters
-        "gradient_accumulation_steps": 1,  # Direct training with large batch
-        "weight_decay": 0.01,
-        "warmup_ratio": 0.1,
-        "lr_scheduler_type": "cosine",
-        "use_rslora": False  # Standard LoRA
+        "batch_size": 8,  # Optimized for quality
+        "learning_rate": 5e-5,  # Lower LR for better convergence
+        "epochs": 5,  # More epochs for better learning
+        "max_length": 256,  # Longer sequences for better context
+        "quantization": None,  # No quantization for better quality
+        "lora_r": 64,  # Higher rank for better representation
+        "lora_alpha": 128,  # 2x lora_r for stability
+        "gradient_accumulation_steps": 4,  # Effective batch = 32
+        "weight_decay": 1e-3,  # L2 regularization
+        "warmup_steps": 200,  # Warmup for stability
+        "lr_scheduler": "cosine"  # Cosine annealing
     },
     "llama3-8b": {
-        "model_name": "meta-llama/Llama-3.1-8B-Instruct", 
-        "batch_size": 24,  # Slightly smaller for 8B model
-        "learning_rate": 5e-5,  # Lower LR for larger model
-        "epochs": 5,  # More epochs for better convergence
-        "max_length": 512,  # Longer sequences for better context
-        "quantization": "none",  # No quantization to maximize performance
-        "lora_r": 128,  # High rank for maximum parameter efficiency
-        "lora_alpha": 256,  # 2x lora_r for optimal scaling
-        "lora_dropout": 0.05,  # Lower dropout for more parameters
-        "gradient_accumulation_steps": 1,  # Direct training with large batch
-        "weight_decay": 0.01,
-        "warmup_ratio": 0.1,
-        "lr_scheduler_type": "cosine",
-        "use_rslora": True  # RS-LoRA for better performance
-    },
-    "llama3-8b-quantized": {
         "model_name": "meta-llama/Llama-3.1-8B-Instruct",
-        "batch_size": 48,  # Even larger batch with quantization
-        "learning_rate": 8e-5,  # Slightly higher for quantized training
-        "epochs": 6,  # More epochs to compensate for quantization
-        "max_length": 768,  # Very long sequences
-        "quantization": "4bit",  # Use quantization for extreme batch sizes
-        "lora_r": 256,  # Very high rank
-        "lora_alpha": 512,  # 2x lora_r for optimal scaling
-        "lora_dropout": 0.03,  # Very low dropout
-        "gradient_accumulation_steps": 1,
-        "weight_decay": 0.008,
-        "warmup_ratio": 0.15,
-        "lr_scheduler_type": "cosine",
-        "use_rslora": True  # RS-LoRA for better performance
+        "batch_size": 6,  # Optimized for quality
+        "learning_rate": 3e-5,  # Lower LR for better convergence
+        "epochs": 5,  # More epochs for better learning
+        "max_length": 320,  # Longer sequences for better context
+        "quantization": None,  # No quantization for better quality
+        "lora_r": 64,  # Higher rank for better representation
+        "lora_alpha": 128,  # 2x lora_r for stability
+        "gradient_accumulation_steps": 5,  # Effective batch = 30
+        "weight_decay": 1e-2,  # Higher L2 regularization for Llama
+        "warmup_steps": 200,  # Warmup for stability
+        "lr_scheduler": "cosine",  # Cosine annealing
+        "use_rslora": True  # RS-LoRA for better efficiency
     }
 }
 
@@ -94,8 +75,6 @@ def get_quantization_config(quantization_type):
         return BitsAndBytesConfig(
             load_in_8bit=True,
         )
-    elif quantization_type == "none" or quantization_type is None:
-        return None
     else:
         return None
 
@@ -142,7 +121,7 @@ def setup_model_and_tokenizer(config):
     else:
         print(f"✅ No need to resize embeddings (vocab size: {len(tokenizer)})")
     
-    # LoRA configuration
+    # LoRA configuration with RS-LoRA support
     lora_config = LoraConfig(
         task_type=TaskType.SEQ_CLS,
         r=config["lora_r"],
@@ -152,7 +131,8 @@ def setup_model_and_tokenizer(config):
             "q_proj", "v_proj", "k_proj", "o_proj",
             "gate_proj", "up_proj", "down_proj"
         ],
-        bias="none"
+        bias="none",
+        use_rslora=config.get("use_rslora", False)  # Support RS-LoRA for better efficiency
     )
     
     # Apply LoRA
@@ -171,27 +151,37 @@ def load_jsonl(path):
     with open(path, "r", encoding="utf-8") as f:
         return [json.loads(line) for line in f]
 
-def preprocess(example, tokenizer, max_length=128):
-    """Preprocess example for classification task - OPTIMIZED FOR SPEED"""
-    # Clean up text - remove [SEP] tokens and extra whitespace
+def preprocess(example, tokenizer, max_length=256):
+    """Preprocess example for classification task - OPTIMIZED FOR QUALITY"""
+    # Enhanced preprocessing with Title/Content structure
     text = example["text"]
+    
+    # Parse Title and Content if separated by [SEP]
     if "[SEP]" in text:
-        # Take the first part before [SEP] as main text
-        text = text.split("[SEP]")[0].strip()
+        parts = text.split("[SEP]", 1)
+        title = parts[0].strip()
+        content = parts[1].strip() if len(parts) > 1 else ""
+        
+        # Enhanced format for better LLM understanding
+        if content:
+            text = f"Title: {title}\nContent: {content}"
+        else:
+            text = f"Title: {title}"
+    else:
+        # If no [SEP], treat as title
+        text = f"Title: {text.strip()}"
     
-    # Basic text cleaning and early truncation for speed
-    text = " ".join(text.split())  # Normalize whitespace
+    # Clean up text - normalize whitespace but preserve structure
+    text = " ".join(text.split())
     
-    # Truncate text early to save tokenization time
-    words = text.split()
-    if len(words) > max_length // 2:  # Rough estimation
-        text = " ".join(words[:max_length // 2])
-    
+    # Tokenize with improved settings for quality
     enc = tokenizer(
         text,
         truncation=True,
         padding="max_length",
         max_length=max_length,
+        add_special_tokens=True,  # Ensure proper special tokens
+        return_attention_mask=True  # Return attention mask for better training
     )
     enc["labels"] = int(example["label"])
     return enc
@@ -241,9 +231,9 @@ def compute_metrics(eval_pred):
 
 
 def train_model(model_key, config, output_base_dir="outputs", quick_train=False):
-    """Train a single model with LoRA - SPEED OPTIMIZED"""
+    """Train a single model with LoRA - QUALITY OPTIMIZED"""
     print(f"\n{'='*60}")
-    print(f"🚀 TRAINING {model_key.upper()} WITH LORA {'(QUICK MODE)' if quick_train else ''}")
+    print(f"🎯 TRAINING {model_key.upper()} WITH LORA FOR QUALITY {'(QUICK MODE)' if quick_train else ''}")
     print(f"{'='*60}")
     
     start_time = time.time()
@@ -259,7 +249,7 @@ def train_model(model_key, config, output_base_dir="outputs", quick_train=False)
         # Prepare dataset
         tokenized_dataset = prepare_dataset(tokenizer, config["max_length"], quick_train)
         
-        # Training arguments - OPTIMIZED FOR SPEED
+        # Training arguments - OPTIMIZED FOR QUALITY
         training_args = TrainingArguments(
             output_dir=output_dir,
             eval_strategy="epoch",
@@ -270,24 +260,24 @@ def train_model(model_key, config, output_base_dir="outputs", quick_train=False)
             per_device_eval_batch_size=config["batch_size"],
             gradient_accumulation_steps=config["gradient_accumulation_steps"],
             num_train_epochs=config["epochs"],
-            weight_decay=0.01,
-            warmup_steps=50,  # Reduced warmup for speed
-            warmup_ratio=0.05,  # Reduced warmup ratio
-            lr_scheduler_type="linear",  # Linear scheduler for simplicity
+            weight_decay=config.get("weight_decay", 0.01),  # Use config weight_decay
+            warmup_steps=config.get("warmup_steps", 100),  # Use config warmup_steps
+            lr_scheduler_type=config.get("lr_scheduler", "linear"),  # Use config scheduler
             load_best_model_at_end=True,
             metric_for_best_model="f1",
             greater_is_better=True,
-            bf16=True,  # Use bfloat16 for speed
+            bf16=True,  # Use bfloat16 for efficiency
             dataloader_num_workers=4,  # More workers for data loading
             gradient_checkpointing=True,
-            report_to=None,  # Disable wandb for speed
-            save_total_limit=1,  # Keep only best checkpoint
-            dataloader_pin_memory=True,  # Pin memory for speed
-            optim="adamw_8bit",  # Memory efficient optimizer
+            report_to=None,  # Disable wandb
+            save_total_limit=2,  # Keep 2 checkpoints for quality training
+            dataloader_pin_memory=True,  # Pin memory
+            optim="adamw_torch",  # Standard AdamW for better quality
             max_grad_norm=1.0,  # Gradient clipping
             logging_dir=f"{output_dir}/logs",
             disable_tqdm=False,  # Keep progress bar
-            dataloader_persistent_workers=True  # Persistent workers for speed
+            dataloader_persistent_workers=True,  # Persistent workers
+            label_smoothing_factor=0.1  # Label smoothing for better generalization
         )
         
         # Create trainer
@@ -298,7 +288,7 @@ def train_model(model_key, config, output_base_dir="outputs", quick_train=False)
             eval_dataset=tokenized_dataset["validation"],
             tokenizer=tokenizer,
             compute_metrics=compute_metrics,
-            callbacks=[EarlyStoppingCallback(early_stopping_patience=1)]
+            callbacks=[EarlyStoppingCallback(early_stopping_patience=2)]  # More patience for quality
         )
         
         # Train
@@ -381,27 +371,18 @@ def train_model(model_key, config, output_base_dir="outputs", quick_train=False)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train LLMs with LoRA - OPTIMIZED FOR RTX A6000")
-    parser.add_argument("--model", 
-                       choices=["mistral-7b-instruct", "llama3-8b", "llama3-8b-quantized", "all"], 
-                       default="all", 
-                       help="Model to train: mistral-7b-instruct, llama3-8b (no quant), llama3-8b-quantized (max batch), or all")
+    parser = argparse.ArgumentParser(description="Train LLMs with LoRA - OPTIMIZED FOR QUALITY")
+    parser.add_argument("--model", choices=["mistral-7b-instruct", "llama3-8b", "all"], default="all", help="Model to train")
     parser.add_argument("--output_dir", default="fine-tuning/outputs", help="Output directory")
     parser.add_argument("--quick", action="store_true", help="Quick training with subset of data")
     
     args = parser.parse_args()
     
-    # Check GPU configuration
+    # Check GPU
     if torch.cuda.is_available():
-        gpu_count = torch.cuda.device_count()
-        print(f"🔧 CUDA GPUs detected: {gpu_count}")
-        
-        total_memory = 0
-        for i in range(gpu_count):
-            gpu_name = torch.cuda.get_device_name(i)
-            gpu_memory = torch.cuda.get_device_properties(i).total_memory / (1024**3)
-            total_memory += gpu_memory
-            print(f"   GPU {i}: {gpu_name} ({gpu_memory:.1f} GB)")
+        gpu_name = torch.cuda.get_device_name(0)
+        gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+        print(f"🔧 GPU: {gpu_name} ({gpu_memory:.1f} GB)")
         
         if gpu_memory < 16:
             print("⚠️  Warning: LLM training requires at least 16GB VRAM")
