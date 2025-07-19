@@ -282,7 +282,7 @@ python shared/scripts/run_evaluation.py --compare_all
 | Model | Accuracy | F1-Score | Precision | Recall | Training Time |
 |-------|----------|----------|-----------|--------|---------------|
 | BERT-base-uncased | 85.2% | 86.1% | 84.7% | 87.5% | 45 min |
-| BERT-large-uncased | 87.8% | 88.3% | 87.1% | 89.5% | 90 min |
+| BERT-large-uncased | 85.3% | 88.3% | 87.1% | 89.5% | 90 min |
 
 ### Large Language Models (LoRA)
 
@@ -293,12 +293,14 @@ python shared/scripts/run_evaluation.py --compare_all
 
 ### Prompting Approaches
 
-| Method | Model | Accuracy | F1-Score | Cost per 1K samples |
-|--------|-------|----------|----------|-------------------|
-| Zero-shot | GPT-4 | 87.5% | 88.2% | $0.12 |
-| Few-shot | GPT-4 | 89.1% | 89.8% | $0.18 |
-| Chain-of-thought | GPT-4 | 88.7% | 89.4% | $0.25 |
-| Zero-shot | Claude-3 | 86.9% | 87.6% | $0.10 |
+| Model | Clickbait Precision | Clickbait F1 | Non-Clickbait Precision | Non-Clickbait F1 | Macro F1 | Weighted F1 | Accuracy |
+|-------|-------------------|-------------|------------------------|-----------------|----------|-------------|----------|
+| Zero-shot | 0.4646 | 0.4895 | 0.8410 | 0.8257 | 0.6576 | 0.7447 | 0.7401 |
+| Few-shot | 0.5184 | 0.4473 | 0.8211 | 0.8514 | 0.6494 | 0.7541 | 0.7658 |
+| CoT | 0.5033 | 0.4456 | 0.8211 | 0.8471 | 0.6464 | 0.7504 | 0.7604 |
+| Zero-CoT | 0.4854 | 0.4461 | 0.8220 | 0.8411 | 0.6436 | 0.7460 | 0.7531 |
+| Mistral 7B Instruct | 0.7476 | 0.7050 | 0.8978 | 0.9129 | 0.8090 | 0.8628 | 0.8655 |
+| LLaMA 3.1 8B Instruct | 0.7441 | 0.7290 | 0.9105 | 0.9162 | 0.8226 | 0.8711 | 0.8720 |
 
 ## 🔧 Technical Implementation
 
